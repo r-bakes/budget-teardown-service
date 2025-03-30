@@ -5,3 +5,16 @@ description = "For automatically tearing down infrastructure on AWS budget notif
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["boto3"]
+
+[dependency-groups]
+dev = [
+  "boto3-stubs[s3]>=1.37.23",
+  "moto[s3]>=5.1.1",
+  "mypy>=1.15.0",
+  "pytest>=8.3.5",
+]
+
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py"] # default pattern anyway
+pythonpath = ["src"]
