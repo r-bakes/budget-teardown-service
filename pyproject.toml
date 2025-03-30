@@ -1,0 +1,7 @@
+[project]
+name = "budget-teardown-service"
+version = "0.1.0"
+description = "For automatically tearing down infrastructure on AWS budget notification."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["boto3"]
