@@ -16,5 +16,5 @@ dev = [
 
 
 [tool.pytest.ini_options]
-python_files = ["test_*.py"] # default pattern anyway
+python_files = ["test_*.py"]
 pythonpath = ["src"]
