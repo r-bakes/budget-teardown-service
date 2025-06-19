@@ -1,13 +1,15 @@
 import boto3
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.client import S3Client
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.data_classes import SNSEvent, event_source
 
 s3: S3Client = boto3.client("s3")
 
 
-def lambda_handler(event, context):
-    message = event["Records"][0]["Sns"]["Message"]
-    print("From SNS: " + message)
+@event_source(data_class=SNSEvent)
+def lambda_handler(event: SNSEvent, context: LambdaContext) -> dict:
+    print("...From SNS:\n" + str(event))
 
     response = s3.list_buckets()
     buckets = [
@@ -21,7 +23,7 @@ def lambda_handler(event, context):
             _enable_public_access_block(bucket)
             _delete_bucket_website(bucket)
 
-    return {"statusCode": 200, "body": "Completed public bucket cleanup"}
+    return {"statusCode": 200, "body": "Completed public bucket cleanup."}
 
 
 def _is_public(bucket: str) -> bool:
@@ -38,7 +40,7 @@ def _is_public(bucket: str) -> bool:
         else:
             print(f"Error checking tags for {bucket}: {e}")
 
-    return True  # Just in case of error, assume public access
+    return True
 
 
 def _enable_public_access_block(bucket: str) -> None:

@@ -4,12 +4,12 @@ version = "0.1.0"
 description = "For automatically tearing down infrastructure on AWS budget notification."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["boto3", "boto3-stubs[s3]>=1.37.23"]
 
-[dependency-groups]
-dev = ["moto[s3]>=5.1.1", "mypy>=1.15.0", "pytest>=8.3.5"]
+dependencies = ["s3-teardown-lambda"]
 
 
-[tool.pytest.ini_options]
-python_files = ["test_*.py"]
-pythonpath = ["src"]
+[tool.uv.sources]
+s3-teardown-lambda = { workspace = true }
+
+[tool.uv.workspace]
+members = ["services/*"]
