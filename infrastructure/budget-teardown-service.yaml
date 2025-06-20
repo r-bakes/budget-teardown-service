@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Deploy all Lambda services, single SNS topic for alerts, and Budget notification to that topic.
+
+Parameters:
+  DeploymentArtifactsBucket:
+    Type: String
+    Description: S3 bucket where all Lambda deployment ZIPs are uploaded.
+  BudgetLimit:
+    Type: Number
+    Default: 20
+    Description: Monthly budget limit in USD.
+  BudgetThresholdPercentage:
+    Type: Number
+    Default: 80
+    Description: Percentage threshold for notifications.
+  ProjectTag:
+    Type: String
+    Default: budget-teardown-service
+    Description: Tag value for “project” to apply to resources.
+  AccessTag:
+    Type: String
+    AllowedValues: [public, private]
+    Default: private
+    Description: Tag value for “access” to apply to resources.
+
+Resources:
+  # NOTE: IAM Role & Policy for Lambdas
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-lambda-execution-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-lambda-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketTagging
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetBucketWebsite
+                  - s3:DeleteBucketWebsite
+                  - s3:ListAllMyBuckets
+                Resource: arn:aws:s3:::*
+      Tags:
+        - Key: project
+          Value: !Ref ProjectTag
+        - Key: access
+          Value: !Ref AccessTag
+        - Key: awsApplication
+          Value: !GetAtt ApplicationRegistry.ApplicationTagValue
+
+  # NOTE: SNS topic for budget notifications
+  BudgetSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-budget-topic"
+      Tags:
+        - Key: project
+          Value: !Ref ProjectTag
+        - Key: access
+          Value: !Ref AccessTag
+        - Key: awsApplication
+          Value: !GetAtt ApplicationRegistry.ApplicationTagValue
+
+  # NOTE: Monthly Budget with SNS notification
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-monthly-budget"
+        BudgetLimit:
+          Amount: !Ref BudgetLimit
+          Unit: USD
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: !Ref BudgetThresholdPercentage
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetSNSTopic
+      ResourceTags:
+        - Key: project
+          Value: !Ref ProjectTag
+        - Key: access
+          Value: !Ref AccessTag
+        - Key: awsApplication
+          Value: !GetAtt ApplicationRegistry.ApplicationTagValue
+
+  # NOTE: AppRegistry registration
+  ApplicationRegistry:
+    Type: AWS::ServiceCatalogAppRegistry::Application
+    Properties:
+      Name: !Sub "${AWS::StackName}"
+      Description: "Tears down public infrastructure on a budget alert."
+
+  # NOTE: Lambda functions, one per service. For each service, you must add a block like this,
+  # replacing <service_name> and handler accordingly, and ensure the ZIP uploaded matches "<service_name>.zip".
+  S3TeardownLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-s3-teardown-lambda"
+      Runtime: python3.13
+      Handler: s3_teardown_lambda.main.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref DeploymentArtifactsBucket
+        S3Key: s3_teardown_lambda.zip # must match uploaded artifact name
+      Timeout: 60
+      MemorySize: 128
+      Tags:
+        - Key: project
+          Value: !Ref ProjectTag
+        - Key: access
+          Value: !Ref AccessTag
+        - Key: awsApplication
+          Value: !GetAtt ApplicationRegistry.ApplicationTagValue
+
+  # Permissions & Subscriptions: SNS -> Lambda
+  S3TeardownLambdaPermissionForSNS:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref S3TeardownLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref BudgetSNSTopic
+
+  SNSSubscriptionForS3TeardownLambda:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref BudgetSNSTopic
+      Protocol: lambda
+      Endpoint: !GetAtt S3TeardownLambdaFunction.Arn
+
+Outputs:
+  SNSTopicArn:
+    Description: ARN of the SNS topic for budget alerts
+    Value: !Ref BudgetSNSTopic
+  LambdaExecutionRoleArn:
+    Description: ARN of the Lambda execution role
+    Value: !GetAtt LambdaExecutionRole.Arn
+  S3TeardownLambdaArn:
+    Description: ARN of the S3 teardown Lambda function
+    Value: !GetAtt S3TeardownLambdaFunction.Arn

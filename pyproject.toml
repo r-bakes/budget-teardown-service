@@ -13,3 +13,6 @@ s3-teardown-lambda = { workspace = true }
 
 [tool.uv.workspace]
 members = ["services/*"]
+
+[tool.pytest.ini_options]
+addopts = "-v"
