@@ -107,7 +107,7 @@ This runs:
 
 1. **package-all**: For each directory under `services/`, runs `scripts/build.sh <service>`, producing `build/<service>.zip`.
 2. **upload-all**: For each service, uploads `build/<service>.zip` to S3 under a unique key (e.g., `<service>-20250620T123456.zip`) and collects CloudFormation parameter overrides.
-3. **do-deploy_internal**: Invokes `aws cloudformation deploy` with:
+3. **do-deploy**: Invokes `aws cloudformation deploy` with:
    - `DeploymentArtifactsBucket=$(AWS_BUCKET)`
    - per-Lambda `S3Key` parameters set to the new artifact key
    - `BudgetLimit`, `BudgetThresholdPercentage`, `ProjectTag`, `AccessTag`
@@ -115,7 +115,7 @@ This runs:
 
 ### 2. Testing
 
-Run unit tests locally (with Moto mocks):
+Run unit tests locally (with Moto mocks). Ensure you execute within the uv .venv:
 
 ```bash
 make test
@@ -149,22 +149,6 @@ This packages new code, uploads under a new key, and updates the stack.
 
 ---
 
-## scripts/build.sh
-
-Usage:
-
-```bash
-./scripts/build.sh <service_name>
-```
-
-- Cleans/creates `build/<service_name>/`.
-- Uses `uv pip install --target build/<service_name> services/<service_name>` so dependencies (from pyproject.toml) and your module code are placed in the folder.
-- Zips contents into `build/<service_name>.zip`.
-
-Ensure your Lambda handler matches the module path, e.g. for `s3_teardown_lambda`, handler in CloudFormation is `s3_teardown_lambda.main.lambda_handler`.
-
----
-
 ## CloudFormation Template Highlights
 
 - **Parameters**:
@@ -178,25 +162,6 @@ Ensure your Lambda handler matches the module path, e.g. for `s3_teardown_lambda
   - Lambda function resources referencing `Code: S3Bucket` and parameterized `S3Key`.
   - SNS subscription and Lambda permission to allow SNS to invoke the Lambda.
 - **Tags**: All resources tagged with `project`, `access`, and `awsApplication`.
-
----
-
-## Environment Variables & Overrides
-
-You can override Makefile defaults via environment:
-
-```bash
-export AWS_BUCKET=my-deploy-bucket
-export AWS_STACK=my-budget-stack
-export AWS_REGION=us-west-2
-export BUDGET_LIMIT=50
-export BUDGET_THRESHOLD=75
-export ProjectTag=my-project
-export AccessTag=private
-make deploy
-```
-
-Or edit the top of the Makefile.
 
 ---
 
