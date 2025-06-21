@@ -1,7 +1,8 @@
 # Budget Teardown Service
 
-> 💡 Automatically tears down publicly accessible AWS resources (e.g., S3 buckets) when an AWS Budget threshold is exceeded. This project uses a Makefile-driven flow plus a build script and CloudFormation to deploy:
+> 💡 Automatically tears down publicly accessible AWS resources (e.g., S3 buckets) when an AWS Budget threshold is exceeded.
 
+This project uses a Makefile-driven flow, a build script and CloudFormation to:
 1. Build and package each service (Lambda) with dependencies.
 2. Upload artifacts under unique keys to a premade S3 bucket.
 3. Deploy/update a single CloudFormation stack that wires AWS Budget → SNS → Lambda for teardown actions.
