@@ -166,4 +166,3 @@ This project provides:
 - A `build.sh` that packages each service (with dependencies) into a ZIP for Lambda.
 - CloudFormation template parameterized to accept S3 keys for each Lambda, so deploying new code is as simple as uploading under a new key and passing it in.
 - AWS Budget → SNS → Lambda wiring to automatically tear down publicly accessible resources when budget thresholds are exceeded.
-- Cleanup guidance to keep S3 costs low.
