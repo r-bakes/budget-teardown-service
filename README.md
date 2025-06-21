@@ -122,23 +122,7 @@ Run unit tests locally (with Moto mocks). Ensure you execute within the uv .venv
 make test
 ```
 
-### 3. Cleaning
-
-- **Build artifacts**:
-
-  ```bash
-  make clean
-  ```
-
-- **Purge S3 artifacts** (after you no longer need old zips):
-
-  ```bash
-  aws s3 rm s3://organization-deployment-artifacts --recursive
-  ```
-
-  Or rely on lifecycle rules for automated expiry.
-
-### 4. Redeploy
+### 3. Redeploy
 
 Whenever code changes:
 
