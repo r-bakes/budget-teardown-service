@@ -13,6 +13,9 @@ Parameters:
     Type: Number
     Default: 80
     Description: Percentage threshold for notifications.
+  LambdaCodeVersion:
+    Type: String
+    Description: Code version to bump to force cloudformation lambda changes.
   ProjectTag:
     Type: String
     Default: budget-teardown-service
@@ -123,7 +126,7 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref DeploymentArtifactsBucket
-        S3Key: s3_teardown_lambda.zip # must match uploaded artifact name
+        S3Key: !Sub "s3_teardown_lambda_${LambdaCodeVersion}.zip" # must match uploaded artifact name
       Timeout: 60
       MemorySize: 128
       Tags:

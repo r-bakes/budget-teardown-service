@@ -1,4 +1,3 @@
-# ---- CONFIG  ----
 AWS_STACK         := budget-teardown-service
 AWS_BUCKET        := organization-deployment-artifacts
 AWS_REGION        := us-east-1
@@ -9,7 +8,6 @@ CF_TEMPLATE       := infrastructure/budget-teardown-service.yaml
 SERVICES_DIR      := services
 BUILD_DIR         := build
 
-# AWS CLI commands
 AWSCLI            := aws
 
 # ---- INTERNAL HELPER VARIABLES ----
@@ -17,22 +15,8 @@ AWSCLI            := aws
 # Find all service directories under SERVICES_DIR (only first-level dirs)
 SERVICE_PATHS     := $(wildcard $(SERVICES_DIR)/*)
 SERVICE_NAMES     := $(notdir $(SERVICE_PATHS))
-
-# Given a service name, define its BUILD_DIR and ZIP and S3 key
-# BUILD_DIR per service: build/<service_name>
-define BUILD_DIR_for
-$(BUILD_DIR)/$(1)
-endef
-
-# ZIP file path: build/<service_name>/<service_name>.zip
-define ZIP_FILE_for
-$(call BUILD_DIR_for,$(1))/$(1).zip
-endef
-
-# S3 key: "<service_name>.zip"
-define S3_KEY_for
-$(1).zip
-endef
+# Get the git SHA to increment the version of the lambdas. 
+GIT_SHA 					:= $(shell git rev-parse --short HEAD)
 
 # ---- PHONY TARGETS ----
 .PHONY: help sync install test clean package-all upload-all deploy do-deploy 
@@ -72,27 +56,12 @@ clean:
 # Zip the service code: assumes code folder is services/<service>/<service>/
 package-all: clean
 	@if [ -z "$(SERVICE_NAMES)" ]; then \
-	  echo "Error: no services found under '$(SERVICES_DIR)'"; \
-	  exit 1; \
+	  echo "Error: no services under $(SERVICES_DIR)"; exit 1; \
 	fi
-	@echo "Found services: [$(SERVICE_NAMES)]"
-	@echo "Packaging services under '$(SERVICES_DIR)/'..."
+	@echo "Found services: $(SERVICE_NAMES)"
 	@for service in $(SERVICE_NAMES); do \
-		echo "  Packaging $$service..."; \
-	  BUILD_SUBDIR="$(BUILD_DIR)/$$service"; \
-	  echo "    BUILD_SUBDIR: $$BUILD_SUBDIR"; \
-	  mkdir -p "$$BUILD_SUBDIR"; \
-	  ZIP_FILE="$$BUILD_SUBDIR/$$service.zip"; \
-	  echo "    ZIP_FILE: $$ZIP_FILE"; \
-	  SERVICE_PATH="$(SERVICES_DIR)/$$service"; \
-	  echo "    SERVICE_PATH: $$SERVICE_PATH"; \
-	  if [ ! -d "$$SERVICE_PATH" ]; then \
-	    echo "    Error: directory $$SERVICE_PATH not found."; \
-	    exit 1; \
-	  fi; \
-	  rm -f "$$ZIP_FILE"; \
-	  cd "$$SERVICE_PATH" && zip -r "$$OLDPWD/$$ZIP_FILE" "$$service" > /dev/null 2>&1; \
-	  echo "    Created $$ZIP_FILE"; \
+	  echo "Building $$service via scripts/build.sh"; \
+	  ./scripts/build.sh $$service; \
 	done
 	@echo "All services packaged."
 
@@ -101,11 +70,11 @@ package-all: clean
 upload-all: package-all
 	@echo "Uploading packages to s3://$(AWS_BUCKET)/"
 	@for service in $(SERVICE_NAMES); do \
-	  ZIP_FILE=$(call ZIP_FILE_for,$$service); \
+	  ZIP_FILE="$(BUILD_DIR)/$$service.zip"; \
 	  if [ ! -f $$ZIP_FILE ]; then \
 	    echo "    Error: $$ZIP_FILE not found. Run make package-all first."; exit 1; \
 	  fi; \
-	  S3_KEY=$(call S3_KEY_for,$$service); \
+	  S3_KEY="$${service}_$(GIT_SHA).zip"; \
 	  echo "  Uploading $$service: $$ZIP_FILE -> s3://$(AWS_BUCKET)/$$S3_KEY"; \
 	  $(AWSCLI) s3 cp $$ZIP_FILE s3://$(AWS_BUCKET)/$$S3_KEY; \
 	done
@@ -123,6 +92,9 @@ do-deploy: upload-all
 	  --parameter-overrides \
 	    DeploymentArtifactsBucket=$(AWS_BUCKET) \
 	    BudgetLimit=$(BUDGET_LIMIT) \
-	    BudgetThresholdPercentage=$(BUDGET_THRESHOLD)
+	    BudgetThresholdPercentage=$(BUDGET_THRESHOLD) \
+			LambdaCodeVersion=$(GIT_SHA)
+	@echo "Purging deployment artifacts from S3 bucket $(AWS_BUCKET)..."
+	$(AWSCLI) s3 rm s3://$(AWS_BUCKET) --recursive
 	@echo "Deployment of stack '$(AWS_STACK)' complete."
 
