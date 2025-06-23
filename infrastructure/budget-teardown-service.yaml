@@ -2,6 +2,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Deploy all Lambda services, single SNS topic for alerts, and Budget notification to that topic.
 
 Parameters:
+  AlertEmail:
+    Type: String
+    Description: Additional email for budget alerts to be sent to.
   DeploymentArtifactsBucket:
     Type: String
     Description: S3 bucket where all Lambda deployment ZIPs are uploaded.
@@ -100,6 +103,8 @@ Resources:
           Subscribers:
             - SubscriptionType: SNS
               Address: !Ref BudgetSNSTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
       ResourceTags:
         - Key: project
           Value: !Ref ProjectTag

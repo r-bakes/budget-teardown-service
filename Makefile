@@ -18,6 +18,13 @@ SERVICE_NAMES     := $(notdir $(SERVICE_PATHS))
 # Get the git SHA to increment the version of the lambdas. 
 GIT_SHA 					:= $(shell git rev-parse --short HEAD)
 
+# Set email for alerts.
+EMAIL ?= 
+ifndef EMAIL
+$(error EMAIL is not set. Please invoke with 'make EMAIL=value')
+endif
+
+
 # ---- PHONY TARGETS ----
 .PHONY: help sync install test clean package-all upload-all deploy do-deploy 
 
@@ -93,7 +100,8 @@ do-deploy: upload-all
 	    DeploymentArtifactsBucket=$(AWS_BUCKET) \
 	    BudgetLimit=$(BUDGET_LIMIT) \
 	    BudgetThresholdPercentage=$(BUDGET_THRESHOLD) \
-			LambdaCodeVersion=$(GIT_SHA)
+			LambdaCodeVersion=$(GIT_SHA) \
+			AlertEmail=$(EMAIL) 
 	@echo "Purging deployment artifacts from S3 bucket $(AWS_BUCKET)..."
 	$(AWSCLI) s3 rm s3://$(AWS_BUCKET) --recursive
 	@echo "Deployment of stack '$(AWS_STACK)' complete."
